@@ -1,0 +1,21 @@
+{
+  "name": "brunda-traders-whatsapp-agent",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev:server -w packages/api",
+    "dev:worker": "npm run dev:worker -w packages/api",
+    "build": "npm run build -w packages/api",
+    "test": "npm run test -w packages/api",
+    "prisma:generate": "npm run prisma:generate -w packages/api",
+    "prisma:migrate": "npm run prisma:migrate -w packages/api",
+    "db:up": "docker compose up -d postgres redis",
+    "db:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
