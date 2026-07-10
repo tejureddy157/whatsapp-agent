@@ -193,17 +193,6 @@ packages/api/
   tests/                      # Vitest suite
 ```
 
-## Roadmap
-
-- [ ] Admin dashboard for non-technical staff to edit pricing, FAQs, and review escalated conversations
-- [ ] Database-backed pricing with tool-calling (instead of static prompt text)
-- [ ] RAG knowledge base for longer-tail policy/FAQ questions
-- [ ] CRM sync and order tracking
-- [ ] Multi-language support (Kannada, Telugu, Hindi)
-- [ ] Broadcast messaging for promotions
-- [ ] Audio transcription and document parsing (currently escalated to a human)
-
----
 
 <div align="center">
 
