@@ -1,5 +1,5 @@
 import { prisma } from "../../shared/db.js";
-import type { Conversation, Message, MessageDirection } from "@prisma/client";
+import type { Conversation, ConversationMode, Message, MessageDirection, SenderType } from "@prisma/client";
 
 export function getActiveConversation(customerId: string): Promise<Conversation | null> {
   return prisma.conversation.findFirst({
@@ -35,6 +35,14 @@ export function markConversationEscalated(conversationId: string): Promise<Conve
   });
 }
 
+export function setConversationMode(conversationId: string, mode: ConversationMode): Promise<Conversation> {
+  return prisma.conversation.update({ where: { id: conversationId }, data: { mode } });
+}
+
+export function getConversationById(conversationId: string): Promise<Conversation | null> {
+  return prisma.conversation.findUnique({ where: { id: conversationId } });
+}
+
 /** Most recent `limit` messages in the conversation, returned oldest-first for chat history ordering. */
 export async function getRecentMessages(conversationId: string, limit: number): Promise<Message[]> {
   const rows = await prisma.message.findMany({
@@ -56,6 +64,8 @@ export interface CreateMessageInput {
   toolCalls?: unknown;
   tokensUsed?: unknown;
   isAutomated?: boolean;
+  senderType?: SenderType;
+  sentByUserId?: string | null;
   status?: "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
 }
 
@@ -72,6 +82,8 @@ export function createMessage(input: CreateMessageInput): Promise<Message> {
       toolCalls: input.toolCalls as any,
       tokensUsed: input.tokensUsed as any,
       isAutomated: input.isAutomated ?? false,
+      senderType: input.senderType ?? (input.direction === "IN" ? "CUSTOMER" : "AI"),
+      sentByUserId: input.sentByUserId ?? null,
       status: input.status,
     },
   });

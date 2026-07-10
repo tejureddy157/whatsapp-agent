@@ -15,16 +15,22 @@
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.1",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/jwt": "^10.2.0",
     "@prisma/client": "^5.20.0",
+    "bcryptjs": "^3.0.3",
     "bullmq": "^5.28.0",
     "dotenv": "^16.4.5",
     "fastify": "^5.10.0",
     "ioredis": "5.10.1",
     "openai": "^4.68.4",
     "pino": "^9.5.0",
+    "socket.io": "^4.8.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.16.11",
     "dotenv-cli": "^7.4.4",
     "pino-pretty": "^11.3.0",

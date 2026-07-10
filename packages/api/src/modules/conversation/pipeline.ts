@@ -19,6 +19,8 @@ import { downloadWhatsAppMedia } from "../whatsapp/media.js";
 import { sendWhatsAppTextMessage } from "../whatsapp/outbound-sender.js";
 import { outboundMessagesQueue } from "../../queues/definitions.js";
 import type { InboundMessageJobData } from "../../queues/definitions.js";
+import { publishRealtimeEvent } from "../../realtime/event-bus.js";
+import type { SenderType } from "@prisma/client";
 
 const FALLBACK_REPLY =
   "We're experiencing a temporary issue on our end. Please try again in a moment, " +
@@ -71,8 +73,33 @@ export async function processInboundMessage(input: InboundMessageJobData): Promi
   let conversation = await getActiveConversation(customer.id);
   if (!conversation) {
     conversation = await createConversation(customer.id, computeWindowExpiry());
+    await publishRealtimeEvent("conversation:new", {
+      conversationId: conversation.id,
+      customerId: customer.id,
+    });
   } else {
     await refreshConversationWindow(conversation.id, computeWindowExpiry());
+  }
+
+  // AI/Human toggle (set from the CRM, persisted on the Conversation row):
+  // while HUMAN, the AI pipeline never runs — the message just lands for a
+  // human agent to see and reply to manually via the CRM's reply endpoint.
+  if (conversation.mode === "HUMAN") {
+    const savedMessage = await createMessage({
+      conversationId: conversation.id,
+      customerId: customer.id,
+      direction: "IN",
+      content: input.text || (input.mediaType ? `[${input.mediaType}]` : ""),
+      waMessageId: input.waMessageId,
+      mediaType: input.mediaType,
+      mediaMimeType: input.mimeType,
+    });
+    await publishRealtimeEvent("conversation:new_message", {
+      conversationId: conversation.id,
+      messageId: savedMessage.id,
+    });
+    log.info("Conversation is in HUMAN mode — message stored, no AI reply");
+    return;
   }
 
   // Fetch context BEFORE inserting the new message, so the LLM sees the
@@ -116,7 +143,7 @@ export async function processInboundMessage(input: InboundMessageJobData): Promi
   // nothing else was written yet, so the retry starts clean. If everything
   // past this point fails, we catch it below and still answer with a
   // fallback message rather than leaving the customer's message unanswered.
-  await createMessage({
+  const inboundMessage = await createMessage({
     conversationId: conversation.id,
     customerId: customer.id,
     direction: "IN",
@@ -124,6 +151,10 @@ export async function processInboundMessage(input: InboundMessageJobData): Promi
     waMessageId: input.waMessageId,
     mediaType: input.mediaType,
     mediaMimeType: input.mimeType,
+  });
+  await publishRealtimeEvent("conversation:new_message", {
+    conversationId: conversation.id,
+    messageId: inboundMessage.id,
   });
 
   let replyText = FALLBACK_REPLY;
@@ -176,6 +207,7 @@ export async function processInboundMessage(input: InboundMessageJobData): Promi
     toWaId: input.fromWaId,
     body: replyText,
     isAutomated: false,
+    senderType: "AI",
     tokensUsed,
     log,
   });
@@ -209,17 +241,26 @@ async function handleRestartCommand(
     toWaId: input.fromWaId,
     body: RESTART_CONFIRMATION_MESSAGE,
     isAutomated: true,
+    senderType: "SYSTEM",
     tokensUsed: null,
     log,
   });
 }
 
-async function enqueueReply(args: {
+/**
+ * Single choke point for creating and enqueueing any outbound reply —
+ * AI-generated, the deterministic restart confirmation, or (via the CRM's
+ * reply endpoint) a human agent's manual message. All three get the same
+ * BullMQ retry/backoff and delivery tracking for free.
+ */
+export async function enqueueReply(args: {
   conversationId: string;
   customerId: string;
   toWaId: string;
   body: string;
   isAutomated: boolean;
+  senderType: SenderType;
+  sentByUserId?: string | null;
   tokensUsed: Record<string, number> | null;
   log: ReturnType<typeof childLogger>;
 }): Promise<void> {
@@ -229,8 +270,14 @@ async function enqueueReply(args: {
     direction: "OUT",
     content: args.body,
     isAutomated: args.isAutomated,
+    senderType: args.senderType,
+    sentByUserId: args.sentByUserId ?? null,
     tokensUsed: args.tokensUsed ?? undefined,
     status: "QUEUED",
+  });
+  await publishRealtimeEvent("conversation:new_message", {
+    conversationId: args.conversationId,
+    messageId: outboundMessage.id,
   });
 
   await outboundMessagesQueue.add("send-outbound-message", {

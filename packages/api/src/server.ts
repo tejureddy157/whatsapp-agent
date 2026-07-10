@@ -1,13 +1,28 @@
 import Fastify from "fastify";
+import fastifyJwt from "@fastify/jwt";
+import fastifyCookie from "@fastify/cookie";
+import fastifyCors from "@fastify/cors";
 import { appConfig } from "./shared/config.js";
 import { logger } from "./shared/logger.js";
 import { prisma } from "./shared/db.js";
 import { redisConnection } from "./shared/redis.js";
 import { whatsappWebhookRoutes } from "./modules/whatsapp/webhook.route.js";
+import { authRoutes } from "./modules/auth/routes.js";
+import { dashboardRoutes } from "./modules/crm/dashboard.route.js";
+import { conversationsRoutes } from "./modules/crm/conversations.route.js";
+import { customersRoutes } from "./modules/crm/customers.route.js";
+import { initSocketServer } from "./realtime/socket-server.js";
 import { AppError } from "./shared/errors.js";
 
 async function buildServer() {
   const app = Fastify({ logger: false, trustProxy: true });
+
+  await app.register(fastifyCors, {
+    origin: appConfig.CRM_FRONTEND_ORIGIN.split(","),
+    credentials: true,
+  });
+  await app.register(fastifyCookie);
+  await app.register(fastifyJwt, { secret: appConfig.JWT_ACCESS_SECRET });
 
   // Capture the raw request body bytes for webhook signature verification
   // (HMAC must run against exactly what Meta sent, not a re-serialized body).
@@ -44,6 +59,10 @@ async function buildServer() {
   });
 
   await app.register(whatsappWebhookRoutes);
+  await app.register(authRoutes);
+  await app.register(dashboardRoutes);
+  await app.register(conversationsRoutes);
+  await app.register(customersRoutes);
 
   app.setErrorHandler((err, request, reply) => {
     if (err instanceof AppError) {
@@ -60,9 +79,11 @@ async function buildServer() {
 
 async function main() {
   const app = await buildServer();
+  const io = initSocketServer(app);
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "Shutting down server");
+    io.close();
     await app.close();
     await prisma.$disconnect();
     await redisConnection.quit();

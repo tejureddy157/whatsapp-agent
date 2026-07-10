@@ -31,6 +31,54 @@ enum MessageStatus {
   FAILED
 }
 
+enum ConversationMode {
+  AI
+  HUMAN
+}
+
+enum SenderType {
+  CUSTOMER
+  AI
+  HUMAN_AGENT
+  SYSTEM
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  SALES_EXECUTIVE
+  SUPPORT_EXECUTIVE
+  VIEWER
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role      @default(SUPPORT_EXECUTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+  sentMessages  Message[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 model Customer {
   id                     String   @id @default(cuid())
   waPhoneNumber          String
@@ -62,6 +110,11 @@ model Conversation {
   customerId          String
   customer            Customer           @relation(fields: [customerId], references: [id])
   status              ConversationStatus @default(ACTIVE)
+  // Admin-controlled, persisted toggle: while HUMAN, the AI pipeline never
+  // runs for this conversation — only a human agent's replies go out. Set
+  // via the CRM, not by the AI itself (contrast with needsHumanAttention
+  // below, which is a one-shot signal, not a sticky mode).
+  mode                ConversationMode   @default(AI)
   windowExpiresAt     DateTime?
   activeFlow          String?
   flowState           Json?
@@ -95,7 +148,15 @@ model Message {
   tokensUsed     Json?
   status         MessageStatus?
   isAutomated    Boolean           @default(false)
+  // Who actually authored this message — explicit and unambiguous, unlike
+  // isAutomated (kept as-is for backward compat; true only for the
+  // deterministic restart confirmation). Drives CRM reporting (AI vs Human
+  // response counts) and the conversation thread UI.
+  senderType     SenderType        @default(CUSTOMER)
+  sentByUserId   String?
+  sentByUser     User?             @relation(fields: [sentByUserId], references: [id])
   createdAt      DateTime          @default(now())
 
   @@index([conversationId, createdAt])
+  @@index([sentByUserId])
 }

@@ -44,6 +44,18 @@ const envSchema = z.object({
   // see modules/llm/system-prompt.ts. A `default/` folder is the fallback
   // when an inbound message's phone_number_id has no matching subfolder.
   BUSINESS_CONFIG_DIR: z.string().default("config/businesses"),
+
+  // --- CRM: auth & real-time ---
+  // Signs/verifies short-lived access tokens (@fastify/jwt). Refresh tokens
+  // are separate opaque random values, hashed at rest — this secret never
+  // touches them. Dev default is fine locally; production sets a real
+  // random secret via the hosting platform's env vars.
+  JWT_ACCESS_SECRET: z.string().default("dev-only-insecure-secret-change-in-production"),
+  JWT_ACCESS_TOKEN_TTL: z.string().default("15m"),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  // Origin(s) allowed to call the CRM API with credentials (the Vercel
+  // frontend). Comma-separated for multiple (e.g. prod + preview deploys).
+  CRM_FRONTEND_ORIGIN: z.string().default("http://localhost:3001"),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
