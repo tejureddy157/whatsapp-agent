@@ -6,10 +6,8 @@ import { useAuthStore } from "@/store/auth-store";
 
 export default function RootPage() {
   const router = useRouter();
-  const { accessToken, isInitializing } = useAuthStore((s) => ({
-    accessToken: s.accessToken,
-    isInitializing: s.isInitializing,
-  }));
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const isInitializing = useAuthStore((s) => s.isInitializing);
 
   useEffect(() => {
     if (isInitializing) return;
