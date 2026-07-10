@@ -32,36 +32,47 @@ enum MessageStatus {
 }
 
 model Customer {
-  id                String   @id @default(cuid())
-  waPhoneNumber     String   @unique
-  name              String?
-  customerType      CustomerType @default(UNKNOWN)
-  preferredLanguage String?
-  isNew             Boolean  @default(true)
-  firstSeenAt       DateTime @default(now())
-  lastSeenAt        DateTime @default(now())
-  notes             String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  waPhoneNumber          String
+  // The WhatsApp phone_number_id of the *business* number the customer
+  // messaged. Scopes customer identity per business so the same WhatsApp
+  // number talking to two different connected businesses gets two separate
+  // customer records.
+  businessPhoneNumberId  String
+  name                   String?
+  customerType           CustomerType @default(UNKNOWN)
+  preferredLanguage      String?
+  isNew                  Boolean  @default(true)
+  firstMessageText       String?
+  firstSeenAt            DateTime @default(now())
+  lastSeenAt             DateTime @default(now())
+  notes                  String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   conversations Conversation[]
   messages      Message[]
 
-  @@index([waPhoneNumber])
+  @@unique([waPhoneNumber, businessPhoneNumberId])
+  @@index([businessPhoneNumberId])
 }
 
 model Conversation {
-  id             String             @id @default(cuid())
-  customerId     String
-  customer       Customer           @relation(fields: [customerId], references: [id])
-  status         ConversationStatus @default(ACTIVE)
-  windowExpiresAt DateTime?
-  activeFlow     String?
-  flowState      Json?
-  startedAt      DateTime           @default(now())
-  endedAt        DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  customerId          String
+  customer            Customer           @relation(fields: [customerId], references: [id])
+  status              ConversationStatus @default(ACTIVE)
+  windowExpiresAt     DateTime?
+  activeFlow          String?
+  flowState           Json?
+  // Set when the AI defers to a human (low confidence, unsupported media,
+  // or an LLM failure) — a lightweight triage flag for staff to review.
+  needsHumanAttention Boolean            @default(false)
+  escalatedAt         DateTime?
+  startedAt           DateTime           @default(now())
+  endedAt             DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   messages Message[]
 
@@ -78,6 +89,8 @@ model Message {
   waMessageId    String?           @unique
   direction      MessageDirection
   content        String
+  mediaType      String?
+  mediaMimeType  String?
   toolCalls      Json?
   tokensUsed     Json?
   status         MessageStatus?

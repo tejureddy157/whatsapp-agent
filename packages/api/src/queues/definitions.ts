@@ -25,6 +25,9 @@ export interface InboundMessageJobData {
   timestamp: string;
   text: string;
   phoneNumberId: string;
+  mediaId?: string;
+  mediaType?: string;
+  mimeType?: string;
 }
 
 export interface OutboundMessageJobData {

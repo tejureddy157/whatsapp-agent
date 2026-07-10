@@ -2,7 +2,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { appConfig } from "../../shared/config.js";
 import { LlmError } from "../../shared/errors.js";
 import { openrouterClient } from "./openrouter-client.js";
-import { loadSystemPrompt } from "./system-prompt.js";
+import { loadSystemPromptForBusiness } from "./system-prompt.js";
 import { buildCurrentDateTimeBlock } from "./datetime-context.js";
 import type { Message as PrismaMessage } from "@prisma/client";
 
@@ -19,22 +19,43 @@ function historyToChatMessages(history: PrismaMessage[]): ChatCompletionMessageP
 }
 
 /**
- * Runs one conversation turn against OpenRouter: static system prompt +
- * dynamic current-date/time block + the last N prior messages (memory) +
- * the new inbound message. Phase 1 has no tools registered — this is a
- * single request/response call. Phase 2 wraps this in a tool-call loop
- * (append tool results as `role: "tool"` messages and re-call) once
- * price/availability/order tools exist.
+ * Runs one conversation turn against OpenRouter: the connected business's
+ * system prompt + dynamic current-date/time block + the last N prior
+ * messages (memory) + the new inbound message. Phase 1 has no tools
+ * registered — this is a single request/response call. Phase 2 wraps this
+ * in a tool-call loop (append tool results as `role: "tool"` messages and
+ * re-call) once price/availability/order tools exist.
  */
 export async function runConversationTurn(params: {
   history: PrismaMessage[];
   userMessage: string;
+  businessPhoneNumberId: string;
+  /** Present when the inbound message was a supported image — passed through for vision-capable models. */
+  imageDataUrl?: string;
+  isNewCustomer?: boolean;
 }): Promise<RunTurnResult> {
+  const userContent: ChatCompletionMessageParam["content"] = params.imageDataUrl
+    ? [
+        { type: "text", text: params.userMessage },
+        { type: "image_url", image_url: { url: params.imageDataUrl } },
+      ]
+    : params.userMessage;
+
   const messages: ChatCompletionMessageParam[] = [
-    { role: "system", content: loadSystemPrompt() },
+    { role: "system", content: loadSystemPromptForBusiness(params.businessPhoneNumberId) },
     { role: "system", content: buildCurrentDateTimeBlock() },
+    ...(params.isNewCustomer
+      ? ([
+          {
+            role: "system",
+            content:
+              "This is this customer's first-ever message to the business — greet them warmly and " +
+              "introduce the business before diving into order details.",
+          },
+        ] as ChatCompletionMessageParam[])
+      : []),
     ...historyToChatMessages(params.history),
-    { role: "user", content: params.userMessage },
+    { role: "user", content: userContent } as ChatCompletionMessageParam,
   ];
 
   let response;

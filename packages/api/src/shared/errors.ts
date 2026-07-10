@@ -26,3 +26,9 @@ export class LlmError extends AppError {
     super(message, "LLM_REQUEST_FAILED", 502);
   }
 }
+
+export class MediaDownloadError extends AppError {
+  constructor(message: string) {
+    super(message, "MEDIA_DOWNLOAD_FAILED", 502);
+  }
+}

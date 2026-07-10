@@ -32,10 +32,18 @@ const envSchema = z.object({
     .string()
     .default("true")
     .transform((v) => v.toLowerCase() === "true"),
+  // WhatsApp ID (no leading +) of a staff/owner number to notify when the AI
+  // escalates a conversation to a human. Optional — if unset, escalations
+  // are still recorded on the Conversation row, just not pushed anywhere.
+  ADMIN_WHATSAPP_NUMBER: z.string().optional().default(""),
 
   CONTEXT_MESSAGE_LIMIT: z.coerce.number().int().positive().default(15),
-  // Resolved relative to the repository root (see repoRoot above), regardless of cwd.
-  SYSTEM_PROMPT_PATH: z.string().default("config/system-prompt.txt"),
+  // Directory of per-business config, resolved relative to the repository
+  // root (see repoRoot above). Each business gets a subfolder named after
+  // its WhatsApp phone_number_id, containing its own system-prompt.txt —
+  // see modules/llm/system-prompt.ts. A `default/` folder is the fallback
+  // when an inbound message's phone_number_id has no matching subfolder.
+  BUSINESS_CONFIG_DIR: z.string().default("config/businesses"),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

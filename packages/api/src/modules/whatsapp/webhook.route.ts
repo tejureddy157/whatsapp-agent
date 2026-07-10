@@ -63,26 +63,43 @@ async function handleWebhookPayload(payload: WhatsAppWebhookEnvelope): Promise<v
       const value = change.value;
 
       for (const message of value.messages ?? []) {
-        if (message.type !== "text" || !message.text) {
-          logger.info({ type: message.type }, "Ignoring non-text inbound message (Phase 1 supports text only)");
-          continue;
-        }
-
         const contactName =
           value.contacts?.find((c) => c.wa_id === message.from)?.profile.name ?? null;
 
-        await inboundMessagesQueue.add(
-          "process-inbound-message",
-          {
-            waMessageId: message.id,
-            fromWaId: message.from,
-            contactName,
-            timestamp: message.timestamp,
-            text: message.text.body,
-            phoneNumberId: value.metadata.phone_number_id,
-          },
-          { jobId: message.id }, // BullMQ-level dedupe on top of the DB-level unique constraint
-        );
+        const baseJobData = {
+          waMessageId: message.id,
+          fromWaId: message.from,
+          contactName,
+          timestamp: message.timestamp,
+          phoneNumberId: value.metadata.phone_number_id,
+        };
+
+        if (message.type === "text" && message.text) {
+          await inboundMessagesQueue.add(
+            "process-inbound-message",
+            { ...baseJobData, text: message.text.body },
+            { jobId: message.id }, // BullMQ-level dedupe on top of the DB-level unique constraint
+          );
+          continue;
+        }
+
+        const media = message.image ?? message.video ?? message.audio ?? message.document ?? message.sticker;
+        if (media) {
+          await inboundMessagesQueue.add(
+            "process-inbound-message",
+            {
+              ...baseJobData,
+              text: media.caption ?? "",
+              mediaId: media.id,
+              mediaType: message.type,
+              mimeType: media.mime_type,
+            },
+            { jobId: message.id },
+          );
+          continue;
+        }
+
+        logger.info({ type: message.type }, "Ignoring unsupported inbound message type");
       }
 
       for (const status of value.statuses ?? []) {

@@ -33,12 +33,25 @@ export interface WhatsAppContact {
   wa_id: string;
 }
 
+export interface WhatsAppMediaObject {
+  id: string;
+  mime_type: string;
+  sha256?: string;
+  caption?: string;
+  filename?: string;
+}
+
 export interface WhatsAppInboundMessage {
   from: string;
   id: string;
   timestamp: string;
   type: string;
   text?: { body: string };
+  image?: WhatsAppMediaObject;
+  audio?: WhatsAppMediaObject;
+  video?: WhatsAppMediaObject;
+  document?: WhatsAppMediaObject;
+  sticker?: WhatsAppMediaObject;
 }
 
 export interface WhatsAppStatusUpdate {

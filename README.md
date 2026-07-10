@@ -28,6 +28,9 @@ This is **Phase 1**: a complete, tested, deployed assistant with memory, a hand-
 - 🧠 **Conversational memory** — the last 15 messages are sent on every turn for context and personalization
 - 🔀 **Model-agnostic LLM gateway** — swap between Claude, GPT, Gemini, or any OpenRouter model with one env var
 - 📝 **Hand-editable brain** — business hours, pricing, tone, and policies live in a plain text file, not code
+- 🏢 **Multi-business ready** — the connected WhatsApp `phone_number_id` selects which business's knowledge file and customer data to use, so one deployment can serve several businesses
+- 🖼️ **Media-aware** — images are passed to vision-capable models directly; documents/audio/video get a graceful acknowledgment instead of being silently dropped
+- 🧑‍💼 **Human escalation** — the AI hands off to staff (with a WhatsApp alert) when it's not confident, when it receives unsupported media, or if the LLM call itself fails
 - 🕒 **Time-aware replies** — the assistant always knows the current date/time in the business's timezone
 - 🔄 **Instant conversation reset** — customers (or testers) can type `restart` for a clean slate
 - 🛡️ **Built to not break** — signature verification, idempotent webhook handling, automatic retries with backoff, and a safe fallback reply if the LLM call ever fails
@@ -132,12 +135,21 @@ All settings live in `.env` (see [`.env.example`](.env.example) for the full ann
 | `WHATSAPP_APP_SECRET` | Verifies inbound webhooks are really from Meta (HMAC-SHA256) |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Shared secret for Meta's webhook verification handshake |
 | `WHATSAPP_DRY_RUN` | `true` logs outbound sends instead of calling the real API |
+| `ADMIN_WHATSAPP_NUMBER` | Staff number notified when a conversation is escalated (optional) |
 | `CONTEXT_MESSAGE_LIMIT` | Exact number of prior messages sent to the model for memory (default `15`) |
-| `SYSTEM_PROMPT_PATH` | Path to the hand-editable business knowledge file |
+| `BUSINESS_CONFIG_DIR` | Directory of per-business config (default `config/businesses`) |
 
-## The System Prompt
+## The System Prompt & Multi-Business Config
 
-[`config/system-prompt.txt`](config/system-prompt.txt) is a **plain text file, not code**. It holds the assistant's tone, behavior rules, and all business facts — hours, pricing, delivery, policies. Edit it directly to change how the assistant behaves or to update business information; no code changes or redeploy logic needed beyond a process restart to pick up the edit.
+Each business gets a folder under [`config/businesses/`](config/businesses), named after its WhatsApp `phone_number_id`, containing a `system-prompt.txt` — a **plain text file, not code**. It holds the assistant's tone, behavior rules, and all business facts — hours, pricing, delivery, policies. Edit it directly to change how the assistant behaves or to update business information; no code changes needed beyond a process restart to pick up the edit.
+
+Inbound messages are routed to the right business by the `phone_number_id` Meta includes on every webhook. No matching folder falls back to [`config/businesses/default/`](config/businesses/default) — which is what makes a single-business setup work with zero extra config. Connecting a second WhatsApp number just means adding a second folder; customer records, conversations, and system prompts are all scoped per business under the hood.
+
+## Media & Escalation
+
+- **Images** are downloaded from Meta and passed directly to the LLM as vision input (for vision-capable OpenRouter models) — no separate image pipeline needed.
+- **Documents, audio, and video** get a warm acknowledgment reply and are automatically flagged for human follow-up, since we can't process them yet.
+- **Low-confidence answers**: the system prompt instructs the model to prefix uncertain replies with a marker that the app strips before the customer ever sees it, flags the conversation (`Conversation.needsHumanAttention`), and — if `ADMIN_WHATSAPP_NUMBER` is set — pings staff directly on WhatsApp.
 
 ## The `restart` Command
 
@@ -165,15 +177,16 @@ Deployed to [Railway](https://railway.app) with managed Postgres and Redis. Poin
 ## Project Structure
 
 ```
-config/system-prompt.txt      # hand-editable business data + assistant behavior rules
+config/businesses/default/system-prompt.txt   # hand-editable business data + behavior rules
+                                                # (one folder per business phone_number_id)
 Dockerfile                    # multi-stage build → single production image
 docker-entrypoint.sh          # runs server + worker in one container
 packages/api/
   prisma/schema.prisma        # Customer / Conversation / Message models
-  src/modules/whatsapp/       # webhook ingress, signature verification, outbound sender
-  src/modules/customers/      # customer recognition (lookup/create by WhatsApp ID)
-  src/modules/conversation/   # pipeline orchestration, restart command, 24h window
-  src/modules/llm/            # OpenRouter client, system prompt loader, date/time context
+  src/modules/whatsapp/       # webhook ingress, signature verification, media download, outbound sender
+  src/modules/customers/      # customer recognition (lookup/create by WhatsApp ID, per business)
+  src/modules/conversation/   # pipeline orchestration, restart command, escalation, 24h window
+  src/modules/llm/            # OpenRouter client, per-business system prompt loader, date/time context
   src/queues/                 # BullMQ queue definitions + processors (inbound/outbound)
   src/server.ts               # Fastify HTTP entrypoint (webhook + health check)
   src/worker.ts                # BullMQ worker entrypoint
@@ -182,12 +195,13 @@ packages/api/
 
 ## Roadmap
 
-- [ ] Admin dashboard for non-technical staff to edit pricing and FAQs
+- [ ] Admin dashboard for non-technical staff to edit pricing, FAQs, and review escalated conversations
 - [ ] Database-backed pricing with tool-calling (instead of static prompt text)
 - [ ] RAG knowledge base for longer-tail policy/FAQ questions
 - [ ] CRM sync and order tracking
 - [ ] Multi-language support (Kannada, Telugu, Hindi)
 - [ ] Broadcast messaging for promotions
+- [ ] Audio transcription and document parsing (currently escalated to a human)
 
 ---
 

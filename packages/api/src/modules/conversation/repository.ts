@@ -28,6 +28,13 @@ export function refreshConversationWindow(conversationId: string, windowExpiresA
   });
 }
 
+export function markConversationEscalated(conversationId: string): Promise<Conversation> {
+  return prisma.conversation.update({
+    where: { id: conversationId },
+    data: { needsHumanAttention: true, escalatedAt: new Date() },
+  });
+}
+
 /** Most recent `limit` messages in the conversation, returned oldest-first for chat history ordering. */
 export async function getRecentMessages(conversationId: string, limit: number): Promise<Message[]> {
   const rows = await prisma.message.findMany({
@@ -44,6 +51,8 @@ export interface CreateMessageInput {
   direction: MessageDirection;
   content: string;
   waMessageId?: string | null;
+  mediaType?: string | null;
+  mediaMimeType?: string | null;
   toolCalls?: unknown;
   tokensUsed?: unknown;
   isAutomated?: boolean;
@@ -58,6 +67,8 @@ export function createMessage(input: CreateMessageInput): Promise<Message> {
       direction: input.direction,
       content: input.content,
       waMessageId: input.waMessageId ?? null,
+      mediaType: input.mediaType ?? null,
+      mediaMimeType: input.mediaMimeType ?? null,
       toolCalls: input.toolCalls as any,
       tokensUsed: input.tokensUsed as any,
       isAutomated: input.isAutomated ?? false,

@@ -1,13 +1,28 @@
 import { prisma } from "../../shared/db.js";
 import type { Customer } from "@prisma/client";
 
-export function findCustomerByWaId(waPhoneNumber: string): Promise<Customer | null> {
-  return prisma.customer.findUnique({ where: { waPhoneNumber } });
+export function findCustomerByWaId(
+  waPhoneNumber: string,
+  businessPhoneNumberId: string,
+): Promise<Customer | null> {
+  return prisma.customer.findUnique({
+    where: { waPhoneNumber_businessPhoneNumberId: { waPhoneNumber, businessPhoneNumberId } },
+  });
 }
 
-export function createCustomer(waPhoneNumber: string, name: string | null): Promise<Customer> {
+export function createCustomer(
+  waPhoneNumber: string,
+  businessPhoneNumberId: string,
+  name: string | null,
+  firstMessageText: string | null,
+): Promise<Customer> {
   return prisma.customer.create({
-    data: { waPhoneNumber, name: name ?? undefined },
+    data: {
+      waPhoneNumber,
+      businessPhoneNumberId,
+      name: name ?? undefined,
+      firstMessageText: firstMessageText ?? undefined,
+    },
   });
 }
 

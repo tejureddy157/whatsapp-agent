@@ -12,22 +12,25 @@ export interface ResolvedCustomer {
 }
 
 /**
- * The sole customer-recognition mechanism: the inbound WhatsApp ID is the
- * only identity anchor, looked up on every inbound message. No separate
- * customer-side login/auth step exists or is needed.
+ * The sole customer-recognition mechanism: the inbound WhatsApp ID, scoped
+ * to the business number the customer messaged, is the only identity
+ * anchor — looked up on every inbound message. No separate customer-side
+ * login/auth step exists or is needed.
  */
 export async function lookupOrCreateCustomer(
   rawWaId: string,
+  businessPhoneNumberId: string,
   contactName: string | null,
+  firstMessageText: string,
 ): Promise<ResolvedCustomer> {
   const waPhoneNumber = normalizeWaId(rawWaId);
 
-  const existing = await findCustomerByWaId(waPhoneNumber);
+  const existing = await findCustomerByWaId(waPhoneNumber, businessPhoneNumberId);
   if (existing) {
     await touchLastSeen(existing.id);
     return { customer: existing, isNewlyCreated: false };
   }
 
-  const created = await createCustomer(waPhoneNumber, contactName);
+  const created = await createCustomer(waPhoneNumber, businessPhoneNumberId, contactName, firstMessageText);
   return { customer: created, isNewlyCreated: true };
 }
