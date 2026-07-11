@@ -96,7 +96,7 @@ export function ConversationThread({ conversationId }: { conversationId: string 
   let lastDay = "";
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">
@@ -107,7 +107,7 @@ export function ConversationThread({ conversationId }: { conversationId: string 
         <ModeToggle conversationId={conversation.id} mode={conversation.mode} />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {messages.map((m) => {
           const showDay = dayLabel(m.createdAt) !== lastDay;
           lastDay = dayLabel(m.createdAt);

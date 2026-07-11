@@ -36,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onOpenMobileMenu={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto bg-muted/30">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto bg-muted/30">{children}</main>
       </div>
     </div>
   );

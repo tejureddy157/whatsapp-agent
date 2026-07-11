@@ -47,7 +47,7 @@ export function CustomerPanel({ conversationId }: { conversationId: string }) {
   const { customer } = data.conversation;
 
   return (
-    <div className="hidden w-72 shrink-0 flex-col overflow-y-auto border-l border-border p-5 xl:flex">
+    <div className="hidden min-h-0 w-72 shrink-0 flex-col overflow-y-auto border-l border-border p-5 xl:flex">
       <div className="flex flex-col items-center gap-3 text-center">
         <Avatar className="size-16">
           <AvatarFallback className="text-lg">{initials(customer.name, customer.waPhoneNumber)}</AvatarFallback>
