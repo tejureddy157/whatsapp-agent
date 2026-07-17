@@ -63,7 +63,7 @@ export async function runConversationTurn(params: {
     response = await openrouterClient.chat.completions.create({
       model: appConfig.OPENROUTER_MODEL,
       messages,
-      max_tokens: 512,
+      max_tokens: 250,
       temperature: 0.4,
     });
   } catch (err) {

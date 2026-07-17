@@ -57,7 +57,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
-  if (res.status === 401 && !options._retried) {
+  // Login has no session to refresh yet — a 401 here just means wrong
+  // credentials, so it must fall through to the generic error handling
+  // below instead of being treated as an expired session.
+  if (res.status === 401 && !options._retried && path !== "/api/auth/login") {
     const refreshed = await refreshSession();
     if (refreshed) {
       return apiRequest<T>(path, { ...options, _retried: true });
